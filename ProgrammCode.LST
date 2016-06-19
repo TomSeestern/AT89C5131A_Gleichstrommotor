@@ -1,0 +1,282 @@
+A51 MACRO ASSEMBLER  PROGRAMMCODE                                                         06/19/2016 14:40:40 PAGE     1
+
+
+MACRO ASSEMBLER A51 V8.00
+OBJECT MODULE PLACED IN ProgrammCode.OBJ
+ASSEMBLER INVOKED BY: C:\Keil\C51\BIN\A51.EXE ProgrammCode.asm SET(SMALL) DEBUG EP
+
+LOC  OBJ            LINE     SOURCE
+
+----                   1     cseg at 0
+0000 802E              2     jmp main
+                       3     
+                       4     
+                       5     ;Externe Interrupt
+                       6     ;------------------------------------------------------------------------------------------
+                             ---
+                       7     ;P3.2  level hochzählen
+0003                   8     org 03h 
+0003 8018              9                jmp runter
+0005 32               10                reti
+                      11     
+0013                  12     org 13h 
+0013 8001             13                jmp hoch
+0015 32               14                reti
+                      15     
+                      16     ;org 0Bh
+                      17                     ;jmp interruptzahlen
+                      18     ;------------------------------------------------------------------------------------------
+                             ---
+0016 E550             19     hoch:                                   mov a,level
+0018 B40F0D           20                                                     cjne a,#000Fh,erhoehe
+001B 8007             21                                                     jmp zurueck
+                      22     
+                      23     
+001D E550             24     runter:                                 mov a,level
+001F B4000A           25                                                     cjne a,#0000h,vermindere
+0022 8000             26                                                     jmp zurueck
+                      27     
+0024 C3               28     zurueck:                                clr C
+0025 1197             29                                                     call anzeigen
+0027 32               30                                                     reti
+                      31     
+                      32     
+0028 0550             33     erhoehe:                inc level
+002A 80F8             34                                     jmp zurueck
+002C 1550             35     vermindere:     dec level
+002E 80F4             36                                     jmp zurueck                      
+                      37     ;------------------------------------------------------------------------------------------
+                             ---
+                      38     
+                      39     
+                      40     
+                      41     ;------------------------------------------------------------------------------------------
+                             ---
+                      42     
+                      43     ;Einsprung (Hauptprogramm)
+0030                  44     main:
+                      45                                                                     ;Vorbereitung für PGM
+                      46     ;------------------------------------------------------------------------------------------
+                             -------------------------------------------------
+                      47     
+                      48     ;Interrupts vorbereiten
+                      49     ;------------------------------------------------------------------------------------------
+                             ---
+0030 D2AF             50     setb ea
+0032 D2A8             51     setb ex0
+0034 D288             52     setb IT0                                        ;Übernehmen bei Aballender Flanke des Inter
+A51 MACRO ASSEMBLER  PROGRAMMCODE                                                         06/19/2016 14:40:40 PAGE     2
+
+                             rupts 0
+0036 D2AA             53     setb ex1
+0038 D28A             54     setb IT1
+                      55     ;------------------------------------------------------------------------------------------
+                             ---
+                      56     
+                      57     
+                      58     ;Equals (Zuweisung der ''Variablen'')
+                      59     ;------------------------------------------------------------------------------------------
+                             ---
+  0030                60     anfangswert equ 30h
+  0004                61     endwert equ 04h
+  0050                62     level equ 50h
+  0060                63     zeahlfaktor equ 60h
+  0070                64     uberlaufzahler equ 70h
+                      65     ;------------------------------------------------------------------------------------------
+                             ---
+                      66     
+                      67     
+                      68     ;Port zuweisung
+                      69     ;------------------------------------------------------------------------------------------
+                             ---
+  00A0                70     Ausgabeport equ p2.0
+  0080                71     AusgabeDisplayport equ p0
+                      72     ;------------------------------------------------------------------------------------------
+                             ---
+                      73     
+                      74     
+                      75     ;Config (Startwerte für das Programm
+                      76     ;------------------------------------------------------------------------------------------
+                             ---
+003A 753000           77     mov anfangswert,#0                       
+003D 7504FF           78     mov endwert,#11111111b
+0040 755001           79     mov level,#1            
+0043 757000           80     mov uberlaufzahler,#0
+                      81     ;------------------------------------------------------------------------------------------
+                             ---
+                      82     
+                      83     
+                      84     ;Timer init (Einstellungen des Timers)
+                      85     ;------------------------------------------------------------------------------------------
+                             ---
+0046 5389F1           86     anl tmod,#11110001b     
+0049 438901           87     orl tmod,#01h
+004C 85308A           88     mov tl0,anfangswert
+004F 85048C           89     mov th0,endwert
+                      90     ;------------------------------------------------------------------------------------------
+                             ---
+                      91     
+                      92     ;------------------------------------------------------------------------------------------
+                             -------------------------------------------------
+                      93     
+                      94     
+                      95     ;Start des eigentlichen Programms
+0052 1197             96     call anzeigen
+0054 8000             97     jmp aus
+                      98     
+                      99     
+                     100     ;Auszyklus für den Motor
+                     101     ;------------------------------------------------------------------------------------------
+                             ---
+0056                 102     aus:
+0056 85308A          103     mov tl0,anfangswert
+0059 85048C          104     mov th0,endwert
+005C C3              105     clr C
+005D 92A0            106     mov Ausgabeport,C
+A51 MACRO ASSEMBLER  PROGRAMMCODE                                                         06/19/2016 14:40:40 PAGE     3
+
+005F 740F            107     mov A,#15                                       ;Akku mit Konstante 15 vorladen
+0061 C3              108     clr C                                           ;Carry bit auf 0 setzen
+0062 9550            109     SUBB A,level                            ;Level wird von 10 Abgezogen um die "Aus" Zeit des 
+                             Ports zu bestimmen allerdings wird das doppelte benötigt (ein durchgang nur 0,06s lang)
+                     110     
+0064 F560            111     mov zeahlfaktor,A                       ; anzahl an duchgängen des zählers mal 2
+                     112     
+                     113     
+0066 117B            114     call zaehlen
+                     115     
+                     116     
+0068 8000            117     jmp an
+                     118     ;------------------------------------------------------------------------------------------
+                             ---
+                     119     
+                     120     
+                     121     ;Auszyklus für den Motor
+                     122     ;------------------------------------------------------------------------------------------
+                             ---
+006A                 123     an:
+006A 85308A          124     mov tl0,anfangswert
+006D 85048C          125     mov th0,endwert
+0070 D3              126     setb C
+0071 92A0            127     mov Ausgabeport,C
+0073 E550            128     mov A,level                                     ;Akku mit level laden           
+0075 F560            129     mov zeahlfaktor,A
+                     130                             
+0077 117B            131     call zaehlen
+                     132     
+                     133     
+0079 80DB            134     jmp aus
+                     135     ;------------------------------------------------------------------------------------------
+                             ---
+                     136     
+                     137     
+                     138     ;Zeitliche verzögerung für den aus bzw an zustand des Motors
+                     139     ;Überprüfung ob Zähler schon so oft übergelaufen ist wie gewünscht
+                     140     ;------------------------------------------------------------------------------------------
+                             ---
+007B                 141     zaehlen:
+007B D28C            142     setb tr0                                                                        ;Starten vo
+                             n timer
+007D E560            143     mov a,zeahlfaktor                                                       ;zeahlfaktor wird g
+                             eladen(Wie oft Überlaufen soll, wird in akku geladen)
+007F B57006          144     cjne a,uberlaufzahler,uberlaufcheck                     ;Akku mit Überlaufzähler vergleiche
+                             n wenn ungleich sprung nach uberlaufcheck sonst weiter
+0082 757000          145     mov uberlaufzahler,#0000h
+0085 C28C            146     clr tr0
+0087 22              147     ret                                                                                     ;sp
+                             ringe zurück zur stelle nach dem zaehlen aufgerufen wurde
+                     148     ;------------------------------------------------------------------------------------------
+                             ---
+                     149     
+                     150     
+                     151     ;Überprüfung ob der Zähler übergelaufen ist
+                     152     ;------------------------------------------------------------------------------------------
+                             ---
+0088                 153     uberlaufcheck:
+0088 308DF0          154     jnb tf0,zaehlen                         ;Timer Überlauf? wenn nein, springe zu zaehlen
+008B 0570            155     inc uberlaufzahler
+008D C28D            156     clr tf0
+008F 85308A          157     mov tl0,anfangswert
+0092 85048C          158     mov th0,endwert
+                     159     
+0095 80E4            160     jmp zaehlen
+                     161     ;------------------------------------------------------------------------------------------
+A51 MACRO ASSEMBLER  PROGRAMMCODE                                                         06/19/2016 14:40:40 PAGE     4
+
+                             ---
+                     162     
+                     163     
+                     164     ;Ausgabe an der 7-Segment-Anzeige
+                     165     ;------------------------------------------------------------------------------------------
+                             ---
+0097                 166     anzeigen:                                       
+0097 E550            167                     mov a, level                                    ; Zahl an level einlesen   
+                                  
+0099 540F            168                     anl a, #0Fh                                             ; obere 4 Bits ausb
+                             lenden
+009B 9000A2          169                     mov dptr, #seg7code                     ; Datenpointer init.
+009E 93              170                     movc a, @a+dptr                                 ; ROM-Zugriff
+009F F580            171                     mov AusgabeDisplayport, a               ; Zahl anzeigen
+00A1 22              172                     ret
+                     173     ;------------------------------------------------------------------------------------------
+                             ---
+                     174     
+                     175     
+                     176     ;look-up Tabelle für die 7-Segment-Anzeige
+                     177     ;------------------------------------------------------------------------------------------
+                             ---
+00A2 7E12BCB6        178     seg7code:   DB 01111110b,00010010b,10111100b,10110110b
+00A6 D2E6EE32        179                             DB 11010010b,11100110b,11101110b,00110010b
+00AA FEF6FACE        180                             DB 11111110b,11110110b,11111010b,11001110b
+00AE 6C9EECE8        181                             DB 01101100b,10011110b,11101100b,11101000b      
+                     182     ;------------------------------------------------------------------------------------------
+                             ---
+                     183     
+                     184             
+                     185                                             
+                     186     end     
+A51 MACRO ASSEMBLER  PROGRAMMCODE                                                         06/19/2016 14:40:40 PAGE     5
+
+SYMBOL TABLE LISTING
+------ ----- -------
+
+
+N A M E             T Y P E  V A L U E   ATTRIBUTES
+
+AN . . . . . . . .  C ADDR   006AH   A   
+ANFANGSWERT. . . .  N NUMB   0030H   A   
+ANZEIGEN . . . . .  C ADDR   0097H   A   
+AUS. . . . . . . .  C ADDR   0056H   A   
+AUSGABEDISPLAYPORT  D ADDR   0080H   A   
+AUSGABEPORT. . . .  B ADDR   00A0H.0 A   
+EA . . . . . . . .  B ADDR   00A8H.7 A   
+ENDWERT. . . . . .  N NUMB   0004H   A   
+ERHOEHE. . . . . .  C ADDR   0028H   A   
+EX0. . . . . . . .  B ADDR   00A8H.0 A   
+EX1. . . . . . . .  B ADDR   00A8H.2 A   
+HOCH . . . . . . .  C ADDR   0016H   A   
+IT0. . . . . . . .  B ADDR   0088H.0 A   
+IT1. . . . . . . .  B ADDR   0088H.2 A   
+LEVEL. . . . . . .  N NUMB   0050H   A   
+MAIN . . . . . . .  C ADDR   0030H   A   
+P0 . . . . . . . .  D ADDR   0080H   A   
+P2 . . . . . . . .  D ADDR   00A0H   A   
+RUNTER . . . . . .  C ADDR   001DH   A   
+SEG7CODE . . . . .  C ADDR   00A2H   A   
+TF0. . . . . . . .  B ADDR   0088H.5 A   
+TH0. . . . . . . .  D ADDR   008CH   A   
+TL0. . . . . . . .  D ADDR   008AH   A   
+TMOD . . . . . . .  D ADDR   0089H   A   
+TR0. . . . . . . .  B ADDR   0088H.4 A   
+UBERLAUFCHECK. . .  C ADDR   0088H   A   
+UBERLAUFZAHLER . .  N NUMB   0070H   A   
+VERMINDERE . . . .  C ADDR   002CH   A   
+ZAEHLEN. . . . . .  C ADDR   007BH   A   
+ZEAHLFAKTOR. . . .  N NUMB   0060H   A   
+ZURUECK. . . . . .  C ADDR   0024H   A   
+
+
+REGISTER BANK(S) USED: 0 
+
+
+ASSEMBLY COMPLETE.  0 WARNING(S), 0 ERROR(S)
